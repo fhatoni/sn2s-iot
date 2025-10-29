@@ -15,6 +15,7 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             overflow-x: hidden;
+            padding-bottom: env(safe-area-inset-bottom); /* Safe area untuk notch phones */
         }
         
         .glass-card {
@@ -131,6 +132,25 @@
             25% { transform: translateX(-10px); }
             75% { transform: translateX(10px); }
         }
+
+        /* FIX: Bottom spacing untuk mobile */
+        .main-content {
+            padding-bottom: 120px; /* Extra space untuk bottom content */
+        }
+
+        .bottom-safe-area {
+            height: env(safe-area-inset-bottom, 20px);
+        }
+
+        /* Scroll improvements untuk mobile */
+        .logs-container {
+            -webkit-overflow-scrolling: touch; /* Smooth scroll iOS */
+            scrollbar-width: none; /* Firefox */
+        }
+
+        .logs-container::-webkit-scrollbar {
+            display: none; /* Chrome/Safari */
+        }
     </style>
 </head>
 <body class="text-gray-800">
@@ -178,7 +198,6 @@
             </form>
             
             <div class="text-center mt-6 text-white text-opacity-70 text-sm">
-                Default: admin / admin
             </div>
         </div>
     </div>
@@ -223,210 +242,216 @@
             </div>
         </nav>
 
-        <!-- Monitoring Page -->
-        <div id="monitoring" class="page active">
-            <!-- Connection Banner -->
-            <div id="connectionBanner" class="glass-card p-4 mb-4 text-white text-center slide-in hidden">
-                <div class="flex items-center justify-center space-x-2">
-                    <i class="fas fa-wifi"></i>
-                    <span id="connectionText">Connected to MQTT Broker</span>
+        <!-- Main Content Area dengan extra bottom spacing -->
+        <div class="main-content px-4">
+            <!-- Monitoring Page -->
+            <div id="monitoring" class="page active">
+                <!-- Connection Banner -->
+                <div id="connectionBanner" class="glass-card p-4 mb-4 text-white text-center slide-in hidden">
+                    <div class="flex items-center justify-center space-x-2">
+                        <i class="fas fa-wifi"></i>
+                        <span id="connectionText">Connected to MQTT Broker</span>
+                    </div>
+                </div>
+
+                <!-- Sensor Gauges -->
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <!-- Suhu Media Gauge -->
+                    <div class="glass-card p-4 text-center">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="text-white text-opacity-80 text-sm">Suhu Media</div>
+                            <i class="fas fa-thermometer-half text-white text-opacity-70"></i>
+                        </div>
+                        <div class="gauge-container mx-auto mb-2">
+                            <canvas id="mediaGauge" width="120" height="120"></canvas>
+                            <div id="mediaValue" class="gauge-value text-white">--</div>
+                        </div>
+                        <div class="text-white text-opacity-80 text-xs">DS18B20</div>
+                    </div>
+
+                    <!-- Suhu Udara Gauge -->
+                    <div class="glass-card p-4 text-center">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="text-white text-opacity-80 text-sm">Suhu Udara</div>
+                            <i class="fas fa-temperature-low text-white text-opacity-70"></i>
+                        </div>
+                        <div class="gauge-container mx-auto mb-2">
+                            <canvas id="udaraGauge" width="120" height="120"></canvas>
+                            <div id="udaraValue" class="gauge-value text-white">--</div>
+                        </div>
+                        <div class="text-white text-opacity-80 text-xs">DHT11</div>
+                    </div>
+
+                    <!-- Kelembaban Gauge -->
+                    <div class="glass-card p-4 text-center col-span-2">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="text-white text-opacity-80 text-sm">Kelembaban</div>
+                            <i class="fas fa-tint text-white text-opacity-70"></i>
+                        </div>
+                        <div class="gauge-container mx-auto mb-2" style="width: 140px; height: 140px;">
+                            <canvas id="humidityGauge" width="140" height="140"></canvas>
+                            <div id="humidityValue" class="gauge-value text-white" style="font-size: 1.8rem;">--</div>
+                        </div>
+                        <div class="text-white text-opacity-80 text-xs">DHT11</div>
+                    </div>
+                </div>
+
+                <!-- System Info -->
+                <div class="glass-card p-4 mb-6"> <!-- Added mb-6 untuk extra bottom margin -->
+                    <h3 class="text-white font-semibold mb-3">Informasi Sistem</h3>
+                    <div class="space-y-2 text-white text-opacity-90">
+                        <div class="flex justify-between">
+                            <span>Status MQTT:</span>
+                            <span id="mqttStatusText" class="font-medium">Disconnected</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Update Terakhir:</span>
+                            <span id="lastUpdate" class="font-medium">--:--:--</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Mode Sistem:</span>
+                            <span id="systemMode" class="font-medium">--</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Broker:</span>
+                            <span class="font-medium">EMQX</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Sensor Gauges -->
-            <div class="grid grid-cols-2 gap-3 mb-4">
-                <!-- Suhu Media Gauge -->
-                <div class="glass-card p-4 text-center">
-                    <div class="flex justify-between items-start mb-2">
-                        <div class="text-white text-opacity-80 text-sm">Suhu Media</div>
-                        <i class="fas fa-thermometer-half text-white text-opacity-70"></i>
+            <!-- Control Page -->
+            <div id="control" class="page">
+                <!-- Mode Control -->
+                <div class="glass-card p-4 mb-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-white font-semibold">Mode Kontrol Sistem</h3>
+                        <div id="modeStatus" class="px-3 py-1 rounded-full text-sm font-medium bg-white bg-opacity-20 text-white">
+                            AUTO
+                        </div>
                     </div>
-                    <div class="gauge-container mx-auto mb-2">
-                        <canvas id="mediaGauge" width="120" height="120"></canvas>
-                        <div id="mediaValue" class="gauge-value text-white">--</div>
+                    
+                    <div class="flex space-x-2">
+                        <button id="autoModeBtn" class="flex-1 bg-green-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
+                            <i class="fas fa-robot mr-2"></i>Auto
+                        </button>
+                        <button id="manualModeBtn" class="flex-1 bg-gray-500 bg-opacity-50 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
+                            <i class="fas fa-hand-paper mr-2"></i>Manual
+                        </button>
                     </div>
-                    <div class="text-white text-opacity-80 text-xs">DS18B20</div>
                 </div>
 
-                <!-- Suhu Udara Gauge -->
-                <div class="glass-card p-4 text-center">
-                    <div class="flex justify-between items-start mb-2">
-                        <div class="text-white text-opacity-80 text-sm">Suhu Udara</div>
-                        <i class="fas fa-temperature-low text-white text-opacity-70"></i>
+                <!-- LED Control -->
+                <div class="glass-card p-4 mb-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-white font-semibold">Kontrol Lampu LED</h3>
+                        <div id="ledStatus" class="px-3 py-1 rounded-full text-sm font-medium bg-red-500 bg-opacity-20 text-white">
+                            OFF
+                        </div>
                     </div>
-                    <div class="gauge-container mx-auto mb-2">
-                        <canvas id="udaraGauge" width="120" height="120"></canvas>
-                        <div id="udaraValue" class="gauge-value text-white">--</div>
+                    
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="ledOnBtn" class="bg-green-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
+                            <i class="fas fa-power-off mr-2"></i>ON
+                        </button>
+                        <button id="ledOffBtn" class="bg-red-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
+                            <i class="fas fa-power-off mr-2"></i>OFF
+                        </button>
                     </div>
-                    <div class="text-white text-opacity-80 text-xs">DHT11</div>
+                    
+                    <div class="mt-3">
+                        <button id="ledToggleBtn" class="w-full bg-yellow-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
+                            <i class="fas fa-sync-alt mr-2"></i>Toggle LED
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Kelembaban Gauge -->
-                <div class="glass-card p-4 text-center col-span-2">
-                    <div class="flex justify-between items-start mb-2">
-                        <div class="text-white text-opacity-80 text-sm">Kelembaban</div>
-                        <i class="fas fa-tint text-white text-opacity-70"></i>
+                <!-- Pompa Control -->
+                <div class="glass-card p-4 mb-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-white font-semibold">Kontrol Pompa Spray</h3>
+                        <div id="pompaStatus" class="px-3 py-1 rounded-full text-sm font-medium bg-red-500 bg-opacity-20 text-white">
+                            OFF
+                        </div>
                     </div>
-                    <div class="gauge-container mx-auto mb-2" style="width: 140px; height: 140px;">
-                        <canvas id="humidityGauge" width="140" height="140"></canvas>
-                        <div id="humidityValue" class="gauge-value text-white" style="font-size: 1.8rem;">--</div>
+                    
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="pompaOnBtn" class="bg-green-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
+                            <i class="fas fa-power-off mr-2"></i>ON
+                        </button>
+                        <button id="pompaOffBtn" class="bg-red-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
+                            <i class="fas fa-power-off mr-2"></i>OFF
+                        </button>
                     </div>
-                    <div class="text-white text-opacity-80 text-xs">DHT11 | Target: 50-52%</div>
+                    
+                    <div class="mt-3">
+                        <button id="pompaToggleBtn" class="w-full bg-yellow-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
+                            <i class="fas fa-sync-alt mr-2"></i>Toggle Pompa
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="glass-card p-4 mb-6"> <!-- Added mb-6 untuk extra bottom margin -->
+                    <h3 class="text-white font-semibold mb-3">Aksi Cepat</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="allOnBtn" class="bg-green-600 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
+                            <i class="fas fa-play mr-2"></i>Semua ON
+                        </button>
+                        <button id="allOffBtn" class="bg-red-600 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
+                            <i class="fas fa-stop mr-2"></i>Semua OFF
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <!-- System Info -->
-            <div class="glass-card p-4">
-                <h3 class="text-white font-semibold mb-3">Informasi Sistem</h3>
-                <div class="space-y-2 text-white text-opacity-90">
-                    <div class="flex justify-between">
-                        <span>Status MQTT:</span>
-                        <span id="mqttStatusText" class="font-medium">Disconnected</span>
+            <!-- Logs Page -->
+            <div id="logs" class="page">
+                <div class="glass-card p-4 mb-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-white font-semibold">Log Aktivitas Sistem</h3>
+                        <button id="clearLogsBtn" class="text-white text-opacity-70 text-sm">
+                            <i class="fas fa-trash mr-1"></i>Clear
+                        </button>
                     </div>
-                    <div class="flex justify-between">
-                        <span>Update Terakhir:</span>
-                        <span id="lastUpdate" class="font-medium">--:--:--</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span>Mode Sistem:</span>
-                        <span id="systemMode" class="font-medium">--</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span>Broker:</span>
-                        <span class="font-medium">EMQX</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Control Page -->
-        <div id="control" class="page">
-            <!-- Mode Control -->
-            <div class="glass-card p-4 mb-4">
-                <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-white font-semibold">Mode Kontrol Sistem</h3>
-                    <div id="modeStatus" class="px-3 py-1 rounded-full text-sm font-medium bg-white bg-opacity-20 text-white">
-                        AUTO
+                    
+                    <div id="logsContainer" class="logs-container space-y-3 max-h-80 overflow-y-auto">
+                        <div class="text-center text-white text-opacity-60 py-8">
+                            <i class="fas fa-history text-2xl mb-2 block"></i>
+                            <p>Belum ada aktivitas</p>
+                        </div>
                     </div>
                 </div>
                 
-                <div class="flex space-x-2">
-                    <button id="autoModeBtn" class="flex-1 bg-green-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
-                        <i class="fas fa-robot mr-2"></i>Auto
-                    </button>
-                    <button id="manualModeBtn" class="flex-1 bg-gray-500 bg-opacity-50 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
-                        <i class="fas fa-hand-paper mr-2"></i>Manual
-                    </button>
+                <div class="glass-card p-4 mb-6"> <!-- Added mb-6 untuk extra bottom margin -->
+                    <h3 class="text-white font-semibold mb-3">Statistik Hari Ini</h3>
+                    <div class="space-y-2 text-white text-opacity-90">
+                        <div class="flex justify-between">
+                            <span>Total Aktivitas:</span>
+                            <span id="totalActivities" class="font-medium">0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>LED Menyala:</span>
+                            <span id="ledOnTime" class="font-medium">0 menit</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Pompa Aktif:</span>
+                            <span id="pumpActiveTime" class="font-medium">0 menit</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Peringatan:</span>
+                            <span id="warningCount" class="font-medium">0</span>
+                        </div>
+                    </div>
                 </div>
             </div>
+        </div> <!-- End Main Content -->
 
-            <!-- LED Control -->
-            <div class="glass-card p-4 mb-4">
-                <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-white font-semibold">Kontrol Lampu LED</h3>
-                    <div id="ledStatus" class="px-3 py-1 rounded-full text-sm font-medium bg-red-500 bg-opacity-20 text-white">
-                        OFF
-                    </div>
-                </div>
-                
-                <div class="grid grid-cols-2 gap-2">
-                    <button id="ledOnBtn" class="bg-green-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
-                        <i class="fas fa-power-off mr-2"></i>ON
-                    </button>
-                    <button id="ledOffBtn" class="bg-red-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
-                        <i class="fas fa-power-off mr-2"></i>OFF
-                    </button>
-                </div>
-                
-                <div class="mt-3">
-                    <button id="ledToggleBtn" class="w-full bg-yellow-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
-                        <i class="fas fa-sync-alt mr-2"></i>Toggle LED
-                    </button>
-                </div>
-            </div>
+        <!-- Extra Bottom Safe Area untuk mobile -->
+        <div class="bottom-safe-area"></div>
 
-            <!-- Pompa Control -->
-            <div class="glass-card p-4 mb-4">
-                <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-white font-semibold">Kontrol Pompa Spray</h3>
-                    <div id="pompaStatus" class="px-3 py-1 rounded-full text-sm font-medium bg-red-500 bg-opacity-20 text-white">
-                        OFF
-                    </div>
-                </div>
-                
-                <div class="grid grid-cols-2 gap-2">
-                    <button id="pompaOnBtn" class="bg-green-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
-                        <i class="fas fa-power-off mr-2"></i>ON
-                    </button>
-                    <button id="pompaOffBtn" class="bg-red-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
-                        <i class="fas fa-power-off mr-2"></i>OFF
-                    </button>
-                </div>
-                
-                <div class="mt-3">
-                    <button id="pompaToggleBtn" class="w-full bg-yellow-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
-                        <i class="fas fa-sync-alt mr-2"></i>Toggle Pompa
-                    </button>
-                </div>
-            </div>
-
-            <!-- Quick Actions -->
-            <div class="glass-card p-4">
-                <h3 class="text-white font-semibold mb-3">Aksi Cepat</h3>
-                <div class="grid grid-cols-2 gap-2">
-                    <button id="allOnBtn" class="bg-green-600 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
-                        <i class="fas fa-play mr-2"></i>Semua ON
-                    </button>
-                    <button id="allOffBtn" class="bg-red-600 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
-                        <i class="fas fa-stop mr-2"></i>Semua OFF
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Logs Page -->
-        <div id="logs" class="page">
-            <div class="glass-card p-4 mb-4">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-white font-semibold">Log Aktivitas Sistem</h3>
-                    <button id="clearLogsBtn" class="text-white text-opacity-70 text-sm">
-                        <i class="fas fa-trash mr-1"></i>Clear
-                    </button>
-                </div>
-                
-                <div id="logsContainer" class="space-y-3 max-h-96 overflow-y-auto">
-                    <div class="text-center text-white text-opacity-60 py-8">
-                        <i class="fas fa-history text-2xl mb-2 block"></i>
-                        <p>Belum ada aktivitas</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="glass-card p-4">
-                <h3 class="text-white font-semibold mb-3">Statistik Hari Ini</h3>
-                <div class="space-y-2 text-white text-opacity-90">
-                    <div class="flex justify-between">
-                        <span>Total Aktivitas:</span>
-                        <span id="totalActivities" class="font-medium">0</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span>LED Menyala:</span>
-                        <span id="ledOnTime" class="font-medium">0 menit</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span>Pompa Aktif:</span>
-                        <span id="pumpActiveTime" class="font-medium">0 menit</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span>Peringatan:</span>
-                        <span id="warningCount" class="font-medium">0</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Floating Action Button -->
-        <div class="fixed bottom-6 right-6">
+        <!-- Floating Action Button - Position Adjusted -->
+        <div class="fixed bottom-6 right-6 z-30">
             <button id="refreshBtn" class="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-2xl floating-btn">
                 <i class="fas fa-sync-alt text-purple-600 text-xl"></i>
             </button>
