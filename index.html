@@ -7,7 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         
@@ -15,6 +14,7 @@
             font-family: 'Inter', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
+            overflow-x: hidden;
         }
         
         .glass-card {
@@ -74,87 +74,237 @@
         .floating-btn:active {
             transform: scale(0.95);
         }
+        
+        .page {
+            display: none;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        .page.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .nav-item {
+            transition: all 0.3s ease;
+        }
+        
+        .nav-item.active {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+        }
+        
+        .log-item {
+            border-left: 3px solid;
+            animation: slideInLeft 0.5s ease-out;
+        }
+        
+        @keyframes slideInLeft {
+            from { transform: translateX(-20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .shake {
+            animation: shake 0.5s ease-in-out;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
     </style>
 </head>
 <body class="text-gray-800">
-    <!-- Header -->
-    <header class="pt-6 pb-4 px-4">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
-                    <i class="fas fa-seedling text-green-500 text-lg"></i>
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="fixed inset-0 bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center z-50">
+        <div class="text-center text-white">
+            <div class="loading-spinner mx-auto mb-4"></div>
+            <h2 class="text-2xl font-bold mb-2">SN2S-IoT System</h2>
+            <p class="text-white text-opacity-80">Loading Smart Nursery Dashboard...</p>
+        </div>
+    </div>
+
+    <!-- Login Screen -->
+    <div id="loginScreen" class="fixed inset-0 bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center z-40 hidden">
+        <div class="glass-card p-8 mx-4 w-full max-w-sm">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                    <i class="fas fa-seedling text-green-500 text-2xl"></i>
                 </div>
-                <div>
-                    <h1 class="text-white font-bold text-xl">SN2S-IoT</h1>
-                    <p class="text-white text-opacity-80 text-sm">Smart Nursery System</p>
-                </div>
+                <h1 class="text-2xl font-bold text-white mb-2">SN2S-IoT</h1>
+                <p class="text-white text-opacity-80">Smart Nursery System</p>
             </div>
             
-            <div id="mqttStatus" class="flex items-center px-3 py-1 bg-white bg-opacity-20 rounded-full">
-                <div class="status-dot bg-red-500"></div>
-                <span class="text-white text-sm font-medium">Offline</span>
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label class="block text-white text-sm font-medium mb-2">Username</label>
+                    <input type="text" id="username" 
+                           class="w-full px-4 py-3 rounded-xl bg-white bg-opacity-20 text-white placeholder-white placeholder-opacity-60 focus:outline-none focus:bg-opacity-30 transition"
+                           placeholder="Masukkan username"
+                           required>
+                </div>
+                
+                <div>
+                    <label class="block text-white text-sm font-medium mb-2">Password</label>
+                    <input type="password" id="password" 
+                           class="w-full px-4 py-3 rounded-xl bg-white bg-opacity-20 text-white placeholder-white placeholder-opacity-60 focus:outline-none focus:bg-opacity-30 transition"
+                           placeholder="Masukkan password"
+                           required>
+                </div>
+                
+                <button type="submit" 
+                        class="w-full bg-white text-purple-600 py-3 rounded-xl font-bold text-lg transition-all active:scale-95 mt-6">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Login
+                </button>
+            </form>
+            
+            <div class="text-center mt-6 text-white text-opacity-70 text-sm">
+                Default: admin / admin
             </div>
         </div>
-    </header>
+    </div>
 
-    <!-- Main Content -->
-    <main class="pb-24 px-4">
-        <!-- Connection Banner -->
-        <div id="connectionBanner" class="glass-card p-4 mb-4 text-white text-center slide-in hidden">
-            <div class="flex items-center justify-center space-x-2">
-                <i class="fas fa-wifi"></i>
-                <span id="connectionText">Connected to MQTT Broker</span>
+    <!-- Main App -->
+    <div id="mainApp" class="hidden">
+        <!-- Header -->
+        <header class="pt-6 pb-4 px-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
+                        <i class="fas fa-seedling text-green-500 text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-white font-bold text-xl">SN2S-IoT</h1>
+                        <p class="text-white text-opacity-80 text-sm" id="currentPage">Monitoring</p>
+                    </div>
+                </div>
+                
+                <div id="mqttStatus" class="flex items-center px-3 py-1 bg-white bg-opacity-20 rounded-full">
+                    <div class="status-dot bg-red-500"></div>
+                    <span class="text-white text-sm font-medium">Offline</span>
+                </div>
             </div>
-        </div>
+        </header>
 
-        <!-- Sensor Gauges -->
-        <div class="grid grid-cols-2 gap-3 mb-4">
-            <!-- Suhu Media Gauge -->
-            <div class="glass-card p-4 text-center">
-                <div class="flex justify-between items-start mb-2">
-                    <div class="text-white text-opacity-80 text-sm">Suhu Media</div>
-                    <i class="fas fa-thermometer-half text-white text-opacity-70"></i>
+        <!-- Navigation -->
+        <nav class="px-4 mb-4">
+            <div class="glass-card p-1 flex">
+                <button class="nav-item flex-1 py-3 text-center text-white font-medium transition-all active" data-page="monitoring">
+                    <i class="fas fa-chart-line mb-1 block"></i>
+                    <span class="text-xs">Monitoring</span>
+                </button>
+                <button class="nav-item flex-1 py-3 text-center text-white font-medium transition-all" data-page="control">
+                    <i class="fas fa-sliders-h mb-1 block"></i>
+                    <span class="text-xs">Kontrol</span>
+                </button>
+                <button class="nav-item flex-1 py-3 text-center text-white font-medium transition-all" data-page="logs">
+                    <i class="fas fa-history mb-1 block"></i>
+                    <span class="text-xs">Log Aktivitas</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Monitoring Page -->
+        <div id="monitoring" class="page active">
+            <!-- Connection Banner -->
+            <div id="connectionBanner" class="glass-card p-4 mb-4 text-white text-center slide-in hidden">
+                <div class="flex items-center justify-center space-x-2">
+                    <i class="fas fa-wifi"></i>
+                    <span id="connectionText">Connected to MQTT Broker</span>
                 </div>
-                <div class="gauge-container mx-auto mb-2">
-                    <canvas id="mediaGauge" width="120" height="120"></canvas>
-                    <div id="mediaValue" class="gauge-value text-white">--</div>
-                </div>
-                <div class="text-white text-opacity-80 text-xs">DS18B20</div>
             </div>
 
-            <!-- Suhu Udara Gauge -->
-            <div class="glass-card p-4 text-center">
-                <div class="flex justify-between items-start mb-2">
-                    <div class="text-white text-opacity-80 text-sm">Suhu Udara</div>
-                    <i class="fas fa-temperature-low text-white text-opacity-70"></i>
+            <!-- Sensor Gauges -->
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <!-- Suhu Media Gauge -->
+                <div class="glass-card p-4 text-center">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="text-white text-opacity-80 text-sm">Suhu Media</div>
+                        <i class="fas fa-thermometer-half text-white text-opacity-70"></i>
+                    </div>
+                    <div class="gauge-container mx-auto mb-2">
+                        <canvas id="mediaGauge" width="120" height="120"></canvas>
+                        <div id="mediaValue" class="gauge-value text-white">--</div>
+                    </div>
+                    <div class="text-white text-opacity-80 text-xs">DS18B20</div>
                 </div>
-                <div class="gauge-container mx-auto mb-2">
-                    <canvas id="udaraGauge" width="120" height="120"></canvas>
-                    <div id="udaraValue" class="gauge-value text-white">--</div>
+
+                <!-- Suhu Udara Gauge -->
+                <div class="glass-card p-4 text-center">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="text-white text-opacity-80 text-sm">Suhu Udara</div>
+                        <i class="fas fa-temperature-low text-white text-opacity-70"></i>
+                    </div>
+                    <div class="gauge-container mx-auto mb-2">
+                        <canvas id="udaraGauge" width="120" height="120"></canvas>
+                        <div id="udaraValue" class="gauge-value text-white">--</div>
+                    </div>
+                    <div class="text-white text-opacity-80 text-xs">DHT11</div>
                 </div>
-                <div class="text-white text-opacity-80 text-xs">DHT11</div>
+
+                <!-- Kelembaban Gauge -->
+                <div class="glass-card p-4 text-center col-span-2">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="text-white text-opacity-80 text-sm">Kelembaban</div>
+                        <i class="fas fa-tint text-white text-opacity-70"></i>
+                    </div>
+                    <div class="gauge-container mx-auto mb-2" style="width: 140px; height: 140px;">
+                        <canvas id="humidityGauge" width="140" height="140"></canvas>
+                        <div id="humidityValue" class="gauge-value text-white" style="font-size: 1.8rem;">--</div>
+                    </div>
+                    <div class="text-white text-opacity-80 text-xs">DHT11 | Target: 50-52%</div>
+                </div>
             </div>
 
-            <!-- Kelembaban Gauge -->
-            <div class="glass-card p-4 text-center col-span-2">
-                <div class="flex justify-between items-start mb-2">
-                    <div class="text-white text-opacity-80 text-sm">Kelembaban</div>
-                    <i class="fas fa-tint text-white text-opacity-70"></i>
-                </div>
-                <div class="gauge-container mx-auto mb-2" style="width: 140px; height: 140px;">
-                    <canvas id="humidityGauge" width="140" height="140"></canvas>
-                    <div id="humidityValue" class="gauge-value text-white" style="font-size: 1.8rem;">--</div>
-                </div>
-                <div class="text-white text-opacity-80 text-xs">DHT11 | Target: 50-52%</div>
-            </div>
-        </div>
-
-        <!-- Control Cards -->
-        <div class="space-y-3 mb-4">
-            <!-- Mode Control -->
+            <!-- System Info -->
             <div class="glass-card p-4">
+                <h3 class="text-white font-semibold mb-3">Informasi Sistem</h3>
+                <div class="space-y-2 text-white text-opacity-90">
+                    <div class="flex justify-between">
+                        <span>Status MQTT:</span>
+                        <span id="mqttStatusText" class="font-medium">Disconnected</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Update Terakhir:</span>
+                        <span id="lastUpdate" class="font-medium">--:--:--</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Mode Sistem:</span>
+                        <span id="systemMode" class="font-medium">--</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Broker:</span>
+                        <span class="font-medium">EMQX</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Page -->
+        <div id="control" class="page">
+            <!-- Mode Control -->
+            <div class="glass-card p-4 mb-4">
                 <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-white font-semibold">Mode Kontrol</h3>
+                    <h3 class="text-white font-semibold">Mode Kontrol Sistem</h3>
                     <div id="modeStatus" class="px-3 py-1 rounded-full text-sm font-medium bg-white bg-opacity-20 text-white">
                         AUTO
                     </div>
@@ -171,9 +321,9 @@
             </div>
 
             <!-- LED Control -->
-            <div class="glass-card p-4">
+            <div class="glass-card p-4 mb-4">
                 <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-white font-semibold">Lampu LED</h3>
+                    <h3 class="text-white font-semibold">Kontrol Lampu LED</h3>
                     <div id="ledStatus" class="px-3 py-1 rounded-full text-sm font-medium bg-red-500 bg-opacity-20 text-white">
                         OFF
                     </div>
@@ -187,12 +337,18 @@
                         <i class="fas fa-power-off mr-2"></i>OFF
                     </button>
                 </div>
+                
+                <div class="mt-3">
+                    <button id="ledToggleBtn" class="w-full bg-yellow-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
+                        <i class="fas fa-sync-alt mr-2"></i>Toggle LED
+                    </button>
+                </div>
             </div>
 
             <!-- Pompa Control -->
-            <div class="glass-card p-4">
+            <div class="glass-card p-4 mb-4">
                 <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-white font-semibold">Pompa Spray</h3>
+                    <h3 class="text-white font-semibold">Kontrol Pompa Spray</h3>
                     <div id="pompaStatus" class="px-3 py-1 rounded-full text-sm font-medium bg-red-500 bg-opacity-20 text-white">
                         OFF
                     </div>
@@ -206,47 +362,75 @@
                         <i class="fas fa-power-off mr-2"></i>OFF
                     </button>
                 </div>
-            </div>
-        </div>
-
-        <!-- Quick Actions -->
-        <div class="glass-card p-4 mb-4">
-            <h3 class="text-white font-semibold mb-3">Aksi Cepat</h3>
-            <div class="grid grid-cols-2 gap-2">
-                <button id="allOnBtn" class="bg-green-600 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
-                    <i class="fas fa-play mr-2"></i>Semua ON
-                </button>
-                <button id="allOffBtn" class="bg-red-600 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
-                    <i class="fas fa-stop mr-2"></i>Semua OFF
-                </button>
-            </div>
-        </div>
-
-        <!-- System Info -->
-        <div class="glass-card p-4">
-            <h3 class="text-white font-semibold mb-3">Informasi Sistem</h3>
-            <div class="space-y-2 text-white text-opacity-90">
-                <div class="flex justify-between">
-                    <span>Status MQTT:</span>
-                    <span id="mqttStatusText" class="font-medium">Disconnected</span>
+                
+                <div class="mt-3">
+                    <button id="pompaToggleBtn" class="w-full bg-yellow-500 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
+                        <i class="fas fa-sync-alt mr-2"></i>Toggle Pompa
+                    </button>
                 </div>
-                <div class="flex justify-between">
-                    <span>Update Terakhir:</span>
-                    <span id="lastUpdate" class="font-medium">--:--:--</span>
-                </div>
-                <div class="flex justify-between">
-                    <span>Broker:</span>
-                    <span class="font-medium">EMQX</span>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="glass-card p-4">
+                <h3 class="text-white font-semibold mb-3">Aksi Cepat</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="allOnBtn" class="bg-green-600 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
+                        <i class="fas fa-play mr-2"></i>Semua ON
+                    </button>
+                    <button id="allOffBtn" class="bg-red-600 text-white py-3 rounded-xl font-medium transition-all active:scale-95">
+                        <i class="fas fa-stop mr-2"></i>Semua OFF
+                    </button>
                 </div>
             </div>
         </div>
-    </main>
 
-    <!-- Floating Action Button -->
-    <div class="fixed bottom-6 right-6">
-        <button id="refreshBtn" class="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-2xl floating-btn">
-            <i class="fas fa-sync-alt text-purple-600 text-xl"></i>
-        </button>
+        <!-- Logs Page -->
+        <div id="logs" class="page">
+            <div class="glass-card p-4 mb-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-white font-semibold">Log Aktivitas Sistem</h3>
+                    <button id="clearLogsBtn" class="text-white text-opacity-70 text-sm">
+                        <i class="fas fa-trash mr-1"></i>Clear
+                    </button>
+                </div>
+                
+                <div id="logsContainer" class="space-y-3 max-h-96 overflow-y-auto">
+                    <div class="text-center text-white text-opacity-60 py-8">
+                        <i class="fas fa-history text-2xl mb-2 block"></i>
+                        <p>Belum ada aktivitas</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="glass-card p-4">
+                <h3 class="text-white font-semibold mb-3">Statistik Hari Ini</h3>
+                <div class="space-y-2 text-white text-opacity-90">
+                    <div class="flex justify-between">
+                        <span>Total Aktivitas:</span>
+                        <span id="totalActivities" class="font-medium">0</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>LED Menyala:</span>
+                        <span id="ledOnTime" class="font-medium">0 menit</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Pompa Aktif:</span>
+                        <span id="pumpActiveTime" class="font-medium">0 menit</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Peringatan:</span>
+                        <span id="warningCount" class="font-medium">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Floating Action Button -->
+        <div class="fixed bottom-6 right-6">
+            <button id="refreshBtn" class="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-2xl floating-btn">
+                <i class="fas fa-sync-alt text-purple-600 text-xl"></i>
+            </button>
+        </div>
     </div>
 
     <!-- Warning Toast -->
@@ -294,6 +478,9 @@
             mqttConnected: false,
             client: null,
             lastUpdate: null,
+            isLoggedIn: false,
+            currentPage: 'monitoring',
+            activityLogs: [],
             data: {
                 suhuMedia: 0,
                 suhuUdara: 0,
@@ -306,6 +493,172 @@
 
         // Gauge contexts
         let mediaGaugeCtx, udaraGaugeCtx, humidityGaugeCtx;
+
+        // Initialize app
+        function initApp() {
+            initGauges();
+            setupEventListeners();
+            showLoadingScreen();
+            
+            // Simulate loading process
+            setTimeout(() => {
+                hideLoadingScreen();
+                showLoginScreen();
+            }, 2000);
+        }
+
+        // Show/hide screens
+        function showLoadingScreen() {
+            document.getElementById('loadingScreen').classList.remove('hidden');
+        }
+
+        function hideLoadingScreen() {
+            document.getElementById('loadingScreen').classList.add('hidden');
+        }
+
+        function showLoginScreen() {
+            document.getElementById('loginScreen').classList.remove('hidden');
+        }
+
+        function hideLoginScreen() {
+            document.getElementById('loginScreen').classList.add('hidden');
+        }
+
+        function showMainApp() {
+            document.getElementById('mainApp').classList.remove('hidden');
+            connectMQTT();
+        }
+
+        // Login system
+        function setupLoginSystem() {
+            const loginForm = document.getElementById('loginForm');
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            
+            loginForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value.trim();
+                
+                if (username === 'admin' && password === 'admin') {
+                    // Login successful
+                    appState.isLoggedIn = true;
+                    addActivityLog('success', 'User login berhasil');
+                    hideLoginScreen();
+                    showMainApp();
+                    showToast('success', 'Login Berhasil', 'Selamat datang di SN2S-IoT Dashboard');
+                } else {
+                    // Login failed
+                    loginForm.classList.add('shake');
+                    addActivityLog('error', 'Login gagal - kredensial salah');
+                    showToast('warning', 'Login Gagal', 'Username atau password salah');
+                    
+                    setTimeout(() => {
+                        loginForm.classList.remove('shake');
+                    }, 500);
+                }
+            });
+        }
+
+        // Activity logging system
+        function addActivityLog(type, message) {
+            const log = {
+                id: Date.now(),
+                type: type, // 'info', 'success', 'warning', 'error'
+                message: message,
+                timestamp: new Date(),
+                icon: getLogIcon(type)
+            };
+            
+            appState.activityLogs.unshift(log);
+            updateLogsDisplay();
+            
+            // Keep only last 50 logs
+            if (appState.activityLogs.length > 50) {
+                appState.activityLogs.pop();
+            }
+            
+            // Save to localStorage
+            localStorage.setItem('sn2s_activity_logs', JSON.stringify(appState.activityLogs));
+        }
+
+        function getLogIcon(type) {
+            const icons = {
+                info: 'fas fa-info-circle',
+                success: 'fas fa-check-circle',
+                warning: 'fas fa-exclamation-triangle',
+                error: 'fas fa-times-circle',
+                mqtt: 'fas fa-satellite-dish',
+                control: 'fas fa-sliders-h',
+                sensor: 'fas fa-microchip'
+            };
+            return icons[type] || icons.info;
+        }
+
+        function updateLogsDisplay() {
+            const container = document.getElementById('logsContainer');
+            const stats = calculateStats();
+            
+            if (appState.activityLogs.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-white text-opacity-60 py-8">
+                        <i class="fas fa-history text-2xl mb-2 block"></i>
+                        <p>Belum ada aktivitas</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = appState.activityLogs.map(log => `
+                <div class="log-item pl-3 border-${getLogColor(log.type)} bg-white bg-opacity-10 p-3 rounded-r-xl">
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-start space-x-3">
+                            <i class="${log.icon} text-${getLogColor(log.type)} mt-1"></i>
+                            <div>
+                                <p class="text-white text-sm">${log.message}</p>
+                                <p class="text-white text-opacity-60 text-xs mt-1">
+                                    ${log.timestamp.toLocaleTimeString('id-ID')}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Update statistics
+            document.getElementById('totalActivities').textContent = stats.total;
+            document.getElementById('ledOnTime').textContent = stats.ledTime + ' menit';
+            document.getElementById('pumpActiveTime').textContent = stats.pumpTime + ' menit';
+            document.getElementById('warningCount').textContent = stats.warnings;
+        }
+
+        function getLogColor(type) {
+            const colors = {
+                info: 'blue-400',
+                success: 'green-400',
+                warning: 'yellow-400',
+                error: 'red-400',
+                mqtt: 'purple-400',
+                control: 'indigo-400',
+                sensor: 'cyan-400'
+            };
+            return colors[type] || colors.info;
+        }
+
+        function calculateStats() {
+            const today = new Date().toDateString();
+            const todayLogs = appState.activityLogs.filter(log => 
+                log.timestamp.toDateString() === today
+            );
+            
+            return {
+                total: todayLogs.length,
+                ledTime: Math.floor(todayLogs.filter(log => log.message.includes('LED')).length / 2),
+                pumpTime: Math.floor(todayLogs.filter(log => log.message.includes('Pompa')).length / 2),
+                warnings: todayLogs.filter(log => log.type === 'warning').length
+            };
+        }
 
         // Initialize gauges
         function initGauges() {
@@ -394,6 +747,7 @@
                 connectionText.textContent = 'Connected to MQTT Broker';
                 banner.className = banner.className.replace('bg-red-500', 'bg-green-500');
                 banner.classList.add('bg-green-500');
+                addActivityLog('mqtt', 'Terhubung ke MQTT broker');
             } else {
                 statusEl.innerHTML = '<div class="status-dot bg-red-500"></div><span class="text-white text-sm font-medium">Offline</span>';
                 statusText.textContent = 'Disconnected';
@@ -401,6 +755,7 @@
                 connectionText.textContent = 'Disconnected from MQTT Broker';
                 banner.className = banner.className.replace('bg-green-500', 'bg-red-500');
                 banner.classList.add('bg-red-500');
+                addActivityLog('error', 'Koneksi MQTT terputus');
             }
         }
 
@@ -409,16 +764,19 @@
             const modeStatus = document.getElementById('modeStatus');
             const ledStatus = document.getElementById('ledStatus');
             const pompaStatus = document.getElementById('pompaStatus');
+            const systemMode = document.getElementById('systemMode');
             
             // Mode status
             if (appState.data.controlMode === 1) {
                 modeStatus.textContent = 'AUTO';
                 modeStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-500 bg-opacity-20 text-white';
+                systemMode.textContent = 'Otomatis';
                 document.getElementById('autoModeBtn').classList.add('bg-green-600');
                 document.getElementById('manualModeBtn').classList.remove('bg-blue-600');
             } else {
                 modeStatus.textContent = 'MANUAL';
                 modeStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-blue-500 bg-opacity-20 text-white';
+                systemMode.textContent = 'Manual';
                 document.getElementById('manualModeBtn').classList.add('bg-blue-600');
                 document.getElementById('autoModeBtn').classList.remove('bg-green-600');
             }
@@ -444,6 +802,7 @@
             // Check for warnings
             if (appState.data.suhuMedia > 30.0) {
                 showToast('warning', 'Peringatan Suhu!', `Suhu media ${appState.data.suhuMedia}°C - LED dimatikan`);
+                addActivityLog('warning', `Suhu media kritis: ${appState.data.suhuMedia}°C`);
             }
             
             // Update last update time
@@ -480,6 +839,7 @@
                             
                             updateGauges();
                             updateDeviceStatus();
+                            addActivityLog('sensor', `Data sensor update: Media ${data.suhuMedia}°C, Udara ${data.suhuUdara}°C, RH ${data.rhUdara}%`);
                         } catch (e) {
                             console.error('Error parsing JSON:', e);
                         }
@@ -506,14 +866,61 @@
         function publishMessage(topic, message) {
             if (appState.client && appState.mqttConnected) {
                 appState.client.publish(topic, message);
+                
+                // Log the activity
+                let action = '';
+                if (topic === MQTT_CONFIG.topics.mode) {
+                    action = message === '1' ? 'Mode Auto' : 'Mode Manual';
+                } else if (topic === MQTT_CONFIG.topics.led) {
+                    action = message === '1' ? 'LED ON' : 'LED OFF';
+                } else if (topic === MQTT_CONFIG.topics.pompa) {
+                    action = message === '1' ? 'Pompa ON' : 'Pompa OFF';
+                }
+                
+                addActivityLog('control', action);
                 showToast('success', 'Perintah Dikirim', 'Perintah berhasil dikirim ke perangkat');
             } else {
                 showToast('warning', 'Tidak Terhubung', 'Tidak terhubung ke MQTT broker');
             }
         }
 
+        // Navigation system
+        function setupNavigation() {
+            const navItems = document.querySelectorAll('.nav-item');
+            const pages = document.querySelectorAll('.page');
+            const currentPageText = document.getElementById('currentPage');
+            
+            navItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    const targetPage = this.getAttribute('data-page');
+                    
+                    // Update active nav item
+                    navItems.forEach(nav => nav.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Update active page
+                    pages.forEach(page => page.classList.remove('active'));
+                    document.getElementById(targetPage).classList.add('active');
+                    
+                    // Update current page text
+                    const pageNames = {
+                        monitoring: 'Monitoring',
+                        control: 'Kontrol Aktuator',
+                        logs: 'Log Aktivitas'
+                    };
+                    currentPageText.textContent = pageNames[targetPage];
+                    appState.currentPage = targetPage;
+                    
+                    addActivityLog('info', `Beralih ke halaman ${pageNames[targetPage]}`);
+                });
+            });
+        }
+
         // Event listeners
         function setupEventListeners() {
+            setupLoginSystem();
+            setupNavigation();
+            
             // Mode control
             document.getElementById('autoModeBtn').addEventListener('click', () => {
                 publishMessage(MQTT_CONFIG.topics.mode, '1');
@@ -532,6 +939,11 @@
                 publishMessage(MQTT_CONFIG.topics.led, '0');
             });
             
+            document.getElementById('ledToggleBtn').addEventListener('click', () => {
+                const newState = !appState.data.isLedOn ? '1' : '0';
+                publishMessage(MQTT_CONFIG.topics.led, newState);
+            });
+            
             // Pompa control
             document.getElementById('pompaOnBtn').addEventListener('click', () => {
                 publishMessage(MQTT_CONFIG.topics.pompa, '1');
@@ -539,6 +951,11 @@
             
             document.getElementById('pompaOffBtn').addEventListener('click', () => {
                 publishMessage(MQTT_CONFIG.topics.pompa, '0');
+            });
+            
+            document.getElementById('pompaToggleBtn').addEventListener('click', () => {
+                const newState = !appState.data.isPompaOn ? '1' : '0';
+                publishMessage(MQTT_CONFIG.topics.pompa, newState);
             });
             
             // Quick actions
@@ -556,28 +973,39 @@
             document.getElementById('refreshBtn').addEventListener('click', () => {
                 if (appState.mqttConnected) {
                     showToast('success', 'Refreshed', 'Data diperbarui');
+                    addActivityLog('info', 'Manual refresh data');
                 } else {
                     connectMQTT();
                 }
             });
+            
+            // Clear logs button
+            document.getElementById('clearLogsBtn').addEventListener('click', () => {
+                appState.activityLogs = [];
+                updateLogsDisplay();
+                localStorage.removeItem('sn2s_activity_logs');
+                showToast('success', 'Logs Cleared', 'Semua log aktivitas telah dihapus');
+                addActivityLog('info', 'Log aktivitas dibersihkan');
+            });
         }
 
-        // Initialize app
-        function initApp() {
-            initGauges();
-            setupEventListeners();
-            connectMQTT();
-            
-            // Auto-reconnect
-            setInterval(() => {
-                if (!appState.mqttConnected) {
-                    connectMQTT();
-                }
-            }, 10000);
+        // Load saved logs from localStorage
+        function loadSavedLogs() {
+            const savedLogs = localStorage.getItem('sn2s_activity_logs');
+            if (savedLogs) {
+                appState.activityLogs = JSON.parse(savedLogs).map(log => ({
+                    ...log,
+                    timestamp: new Date(log.timestamp)
+                }));
+                updateLogsDisplay();
+            }
         }
 
         // Start the app
-        document.addEventListener('DOMContentLoaded', initApp);
+        document.addEventListener('DOMContentLoaded', function() {
+            initApp();
+            loadSavedLogs();
+        });
     </script>
 </body>
 </html>
